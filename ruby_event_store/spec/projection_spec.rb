@@ -4,6 +4,8 @@ module RubyEventStore
   RSpec.describe Projection do
     MoneyDeposited = Class.new(RubyEventStore::Event)
     MoneyWithdrawn = Class.new(RubyEventStore::Event)
+    MoneyLost      = Class.new(RubyEventStore::Event)
+    MoneyInvested  = Class.new(RubyEventStore::Event)
 
     let(:event_store) { RubyEventStore::Client.new(repository: repository, mapper: mapper) }
     let(:mapper)      { Mappers::NullMapper.new }
@@ -229,6 +231,22 @@ module RubyEventStore
       expect(repository).to receive(:read).with(expected).and_return([])
 
       Projection.from_stream("FancyStream").run(event_store, count: 2)
+    end
+
+    specify "supports event class remapping" do
+      event_store = RubyEventStore::Client.new(
+        repository: repository,
+        mapper: Mappers::Default.new(events_class_remapping: { 'MoneyInvested' => 'MoneyLost' })
+      )
+      event_store.append(MoneyInvested.new(data: { amount: 1 }))
+
+      balance =
+        Projection
+          .from_all_streams
+          .init( -> { { total: 0 } })
+          .when(MoneyLost, ->(state, event) { state[:total] -= event.data[:amount] })
+          .run(event_store)
+      expect(balance).to eq(total: -1)
     end
   end
 end

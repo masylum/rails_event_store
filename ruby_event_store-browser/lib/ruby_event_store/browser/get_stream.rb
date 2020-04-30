@@ -30,7 +30,11 @@ module RubyEventStore
       attr_reader :stream_name, :routing, :related_streams_query
 
       def related_streams
-        related_streams_query.call(stream_name)
+        if related_streams_query == DEFAULT_RELATED_STREAMS_QUERY
+          nil
+        else
+          related_streams_query.call(stream_name)
+        end
       end
     end
   end
